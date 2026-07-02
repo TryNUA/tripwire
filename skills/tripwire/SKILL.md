@@ -53,3 +53,16 @@ project root.
    errors) don't warrant a report — mention them only if asked.
 5. **When asked about found bugs or past reports**, list `.tripwire/reports/`
    (newest first) and show the requested report's markdown in chat.
+6. **Filing to Linear — only with permission.** Saving a report locally is
+   always safe; creating a Linear issue is an external side effect. File one
+   only when the user asks, or after they say yes when you offer. Then:
+
+   ```
+   tripwire file                          # newest saved report
+   tripwire file .tripwire/reports/<name>.md --team ENG
+   ```
+
+   It creates the issue and prints `IDENTIFIER URL` — share that URL with the
+   user. Requires `LINEAR_API_KEY` in the environment (`--team` optional when
+   the workspace has one team, or set `LINEAR_TEAM`). If the key is missing,
+   relay the command's guidance instead of hunting for credentials yourself.

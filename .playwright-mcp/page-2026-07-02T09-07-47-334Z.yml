@@ -1,0 +1,14 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - button "🏔️ Trailhead Goods" [ref=e5] [cursor=pointer]
+    - button "Cart (1)" [ref=e39] [cursor=pointer]
+  - main [ref=e7]:
+    - generic [ref=e55]:
+      - heading "Checkout" [level=1] [ref=e56]
+      - generic [ref=e58]:
+        - generic [ref=e59]: 1 item(s)
+        - strong [ref=e60]: $28.00
+      - alert [ref=e64]: ⚠️ Payment failed. Please try again.
+      - generic [ref=e61]:
+        - button "← Back to cart" [ref=e62] [cursor=pointer]
+        - button "Paying…" [disabled] [ref=e65]

@@ -5,6 +5,17 @@
 # when clean; silent (allow) on any error.
 set -u
 
+INPUT=$(cat 2>/dev/null || echo '{}')
+# For Bash tool calls, only browser-driving commands warrant a status check.
+case "$INPUT" in
+  *'"tool_name":"Bash"'* | *'"tool_name": "Bash"'*)
+    case "$INPUT" in
+      *playwright* | *puppeteer* | *chromium* | *remote-debugging-port*) ;;
+      *) exit 0 ;;
+    esac
+    ;;
+esac
+
 TW="$CLAUDE_PLUGIN_DATA/venv/bin/tripwire"
 [ -x "$TW" ] || exit 0
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0

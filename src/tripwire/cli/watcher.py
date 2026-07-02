@@ -48,6 +48,11 @@ _REQUEST_SESSION_CAP = 4096
 _OBSERVER_JS = importlib.resources.files("tripwire.cli").joinpath("observer.js").read_text()
 
 _PERSIST_INTERVAL = 2.0
+# Browser discovery must be fast: a Playwright test browser lives for seconds,
+# and everything before attach is lost (history is not retroactive). Chromium
+# takes a few hundred ms to create its first page, so a 250ms poll attaches
+# before any test traffic happens.
+_DISCOVER_INTERVAL = 0.25
 
 
 class Watcher:
@@ -284,7 +289,7 @@ async def _watch(args: Any) -> int:
                 if not waiting_logged:
                     print(f"tripwire: waiting for a browser at {http_url}", flush=True)
                     waiting_logged = True
-                await _wait(watcher.stop, _PERSIST_INTERVAL)
+                await _wait(watcher.stop, _DISCOVER_INTERVAL)
                 continue
             waiting_logged = False
             await watcher.attach(client)

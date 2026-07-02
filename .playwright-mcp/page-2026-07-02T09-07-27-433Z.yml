@@ -1,0 +1,18 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - button "🏔️ Trailhead Goods" [ref=e5] [cursor=pointer]
+    - button "Cart (1)" [active] [ref=e39] [cursor=pointer]
+  - main [ref=e7]:
+    - generic [ref=e42]:
+      - heading "Your cart" [level=1] [ref=e43]
+      - list [ref=e44]:
+        - listitem [ref=e45]:
+          - generic [ref=e46]: 👕 Trailhead Tee × 1
+          - generic [ref=e47]: $28.00
+          - button "Remove" [ref=e48] [cursor=pointer]
+      - generic [ref=e49]:
+        - generic [ref=e50]: Subtotal
+        - strong [ref=e51]: $28.00
+      - generic [ref=e52]:
+        - button "← Keep shopping" [ref=e53] [cursor=pointer]
+        - button "Checkout →" [ref=e54] [cursor=pointer]

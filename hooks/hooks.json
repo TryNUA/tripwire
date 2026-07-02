@@ -19,11 +19,29 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/ensure-watcher.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/ensure-watcher.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "mcp__.*browser_.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/report-status.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",

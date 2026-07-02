@@ -65,6 +65,21 @@ anomaly is a real bug — and if so, `tripwire save --summary "..."` produces
 the ready-to-file report in `.tripwire/reports/` and shows it to you. So
 `"make sure checkout works"` (optionally under `/loop`) just works.
 
+## Filing to Linear
+
+Saved reports can go straight to Linear: export a personal API key
+(`LINEAR_API_KEY`, from linear.app → Settings → Security & access) and run
+
+```bash
+tripwire file                    # newest saved report → Linear issue
+tripwire file path/to/report.md --team ENG
+```
+
+`--team` takes a team key or name and is optional when the workspace has a
+single team (or `LINEAR_TEAM` is set). The report's title line becomes the
+issue title, the rest the description; the command prints the new issue's
+identifier and URL. Agents using the skill only file when you ask or approve.
+
 Without Claude Code: `pip install 'tripwire[cli]'`, launch any Chromium with
 `--remote-debugging-port=9222` (Chrome 136+ requires a non-default
 `--user-data-dir` for this; `tripwire watch --launch` handles that for you),

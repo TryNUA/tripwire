@@ -7,6 +7,7 @@ extra (websockets) and imports it lazily so the other commands work without it.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -33,11 +34,21 @@ def main(argv: list[str] | None = None) -> int:
     save = sub.add_parser("save", help="write the bug report to .tripwire/reports/")
     save.add_argument("--summary", required=True, help="short bug description")
 
+    file_cmd = sub.add_parser("file", help="file a saved report as a Linear issue")
+    file_cmd.add_argument(
+        "report", nargs="?", default="", help="report .md path (default: newest saved report)"
+    )
+    file_cmd.add_argument(
+        "--team", default="", help="Linear team key or name (default: $LINEAR_TEAM or sole team)"
+    )
+
     args = parser.parse_args(argv)
     if args.command == "watch":
         return _watch(args)
     if args.command == "status":
         return _status()
+    if args.command == "file":
+        return _file(args)
     return _save(args.summary)
 
 
@@ -105,6 +116,40 @@ def _save(summary: str) -> int:
         session.model_dump_json(exclude={"pid", "cdp_http_url"}), encoding="utf-8"
     )
     print(md_path)
+    return 0
+
+
+def _file(args: argparse.Namespace) -> int:
+    from tripwire.integrations import linear
+
+    api_key = os.environ.get("LINEAR_API_KEY", "")
+    if not api_key:
+        print(
+            "LINEAR_API_KEY is not set — create a personal API key at\n"
+            "https://linear.app/settings/account/security and export it",
+            file=sys.stderr,
+        )
+        return 1
+    if args.report:
+        report_path = Path(args.report)
+    else:
+        reports = sorted((state.STATE_DIR / "reports").glob("*.md"))
+        if not reports:
+            print("no saved reports — run `tripwire save` first", file=sys.stderr)
+            return 1
+        report_path = reports[-1]
+    if not report_path.exists():
+        print(f"report not found: {report_path}", file=sys.stderr)
+        return 1
+    title, _, description = report_path.read_text(encoding="utf-8").partition("\n")
+    title = title.lstrip("# ").strip() or report_path.stem
+    try:
+        team_id = linear.resolve_team_id(api_key, args.team or os.environ.get("LINEAR_TEAM", ""))
+        identifier, url = linear.create_issue(api_key, team_id, title, description.strip())
+    except linear.LinearError as exc:
+        print(f"linear: {exc}", file=sys.stderr)
+        return 1
+    print(f"{identifier} {url}")
     return 0
 
 

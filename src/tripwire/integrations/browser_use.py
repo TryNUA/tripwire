@@ -94,19 +94,30 @@ class BrowserUseAttachment:
         """Fetch response bodies for failed requests; finalize environment.
 
         Async counterpart of the automatic fetch the Playwright adapter does
-        inside ``snapshot()``. Call after the run, before ``report()``.
+        inside ``snapshot()``. Call before ``report()`` — and before the
+        browser session is stopped (``agent.run()`` tears the browser down on
+        completion, and CDP response bodies die with it). Safe to call after
+        every step; already-fetched bodies are never re-requested.
         """
-        send = self.browser_session.cdp_client.send
-        for request_id in self.recorder.pending_failed_request_ids():
+        pending = self.recorder.pending_failed_request_ids()
+        if pending:
             try:
-                result = await send.Network.getResponseBody(
-                    params={"requestId": request_id},
-                    session_id=self._request_sessions.get(request_id),
-                )
+                send = self.browser_session.cdp_client.send
             except Exception:
-                self.recorder.set_response_body(request_id, BODY_UNAVAILABLE)
-                continue
-            self.recorder.set_response_body(request_id, _decode_body(result))
+                send = None
+            for request_id in pending:
+                if send is None:
+                    self.recorder.set_response_body(request_id, BODY_UNAVAILABLE)
+                    continue
+                try:
+                    result = await send.Network.getResponseBody(
+                        params={"requestId": request_id},
+                        session_id=self._request_sessions.get(request_id),
+                    )
+                except Exception:
+                    self.recorder.set_response_body(request_id, BODY_UNAVAILABLE)
+                    continue
+                self.recorder.set_response_body(request_id, _decode_body(result))
         with contextlib.suppress(Exception):
             url = await self.browser_session.get_current_page_url()
             if url and url != "about:blank":

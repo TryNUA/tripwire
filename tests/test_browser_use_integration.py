@@ -380,6 +380,24 @@ class TestCDPFailures:
         asyncio.run(attachment.fetch_failed_bodies())
         assert client.sent_named("Network.getResponseBody") == []
 
+    def test_fetch_after_browser_stopped_marks_bodies_unavailable(self):
+        # agent.run() stops the browser on completion; cdp_client then raises
+        # ("CDP client not initialized"). Must degrade, not crash.
+        recorder, client, attachment = make_attached()
+        fail_request(client)
+
+        class StoppedBrowserSession:
+            @property
+            def cdp_client(self):
+                raise AssertionError("CDP client not initialized")
+
+            async def get_current_page_url(self):
+                raise RuntimeError("browser stopped")
+
+        attachment.browser_session = StoppedBrowserSession()
+        asyncio.run(attachment.fetch_failed_bodies())
+        assert recorder.snapshot().network[0].response_body == "body_unavailable"
+
     def test_fetch_twice_is_idempotent(self):
         recorder, client, attachment = make_attached({"Network.getResponseBody": {"body": "x"}})
         fail_request(client)

@@ -2,25 +2,26 @@
 
 **Rich bug reports for AI browser agents.**
 
-When your agent hits a bug while driving a web app, tripwire gives you
-everything a developer needs to fix it — console logs, network requests,
-repro steps, environment info — captured passively while the agent works,
-redacted, and rendered as a ready-to-file markdown issue.
+When your agent hits a bug while driving a web app, tripwire gives you the
+information a developer needs to fix it: console logs, network requests,
+repro steps, and environment info. It captures this in the background while
+the agent works, redacts secrets, and renders it as a markdown issue you can
+file directly.
 
 Built for agents driving Chromium via CDP: Playwright,
 [browser-use](https://github.com/browser-use/browser-use), Puppeteer bridges,
-or any DevTools-protocol client. Zero dependencies beyond `pydantic`.
+or any DevTools-protocol client. The only dependency is `pydantic`.
 
-> ⚠️ Pre-1.0: the API is still settling. Pin a commit.
+> ⚠️ Pre-1.0: the API may change. Pin a commit.
 
 ## Why
 
-Agents encounter bugs constantly — and then file issues like *"checkout seems
-broken"*. The forensics a human developer needs (the uncaught exception, the
-500 response body, what the agent did in step 4) were all right there in the
-browser and got thrown away. Browser-extension capture tools solve this for
-humans; nothing solved it for agents. Your agent already owns the browser —
-tripwire just keeps the evidence.
+Agents hit bugs often, then file issues like *"checkout seems broken"*. The
+details a developer needs (the uncaught exception, the 500 response body,
+what the agent did in step 4) were in the browser but never saved.
+Browser-extension capture tools do this for humans; nothing did it for
+agents. Since your agent already controls the browser, tripwire records this
+information as the agent works.
 
 ## Install
 
@@ -30,7 +31,7 @@ pip install git+https://github.com/TryNUA/tripwire  # PyPI soon
 
 ## Quickstart (Playwright)
 
-Three touchpoints: attach, step, report.
+Three steps: attach, step, report.
 
 ```python
 from playwright.sync_api import sync_playwright
@@ -55,16 +56,17 @@ with sync_playwright() as p:
                    attachment=snapshot.model_dump_json())
 ```
 
-**Attach before the bug happens.** Console and network history can't be
-reconstructed retroactively — `attach()` at page creation, report at failure.
+**Attach before the bug happens.** Console and network history cannot be
+recovered after the fact. Call `attach()` when the page is created and
+generate the report when a failure happens.
 
 Async Playwright: use `attach_async(recorder, page)` and call
 `await fetch_failed_bodies(recorder, cdp)` before rendering the report.
 
 ## With a Claude tool-use loop
 
-Each tool call Claude makes is one repro step; give Claude a `report_bug` tool
-and the report writes itself:
+Each tool call Claude makes is one repro step. Give Claude a `report_bug`
+tool and the report is generated automatically:
 
 ```python
 for block in response.content:
@@ -101,18 +103,19 @@ for block in response.content:
 | POST | /api/orders | 500 | 342ms |
 ```
 
-…plus collapsible request/response bodies for the failures.
+The report also includes collapsible request/response bodies for the failed
+requests.
 
-## Redaction, by construction
+## Redaction
 
 Reports leave your machine, so tripwire is conservative about what it stores:
 
-- **Request/response headers are never stored** — `Authorization` and `Cookie`
-  can't leak because they're never read.
-- Bodies are kept **only for failed requests** (status ≥ 400 or network error),
-  capped at 4 KB, with values of keys matching
-  `token|key|secret|password|code|session|auth` scrubbed — in bodies and URL
-  query strings.
+- **Request/response headers are never stored.** `Authorization` and `Cookie`
+  cannot leak because they are never read.
+- Bodies are kept **only for failed requests** (status ≥ 400 or network
+  error), capped at 4 KB. Values of keys matching
+  `token|key|secret|password|code|session|auth` are scrubbed from bodies and
+  URL query strings.
 - Pass your own secrets to scrub anywhere:
   `RecorderConfig(extra_secret_values=[MY_PASSWORD])`.
 - Ring buffers cap memory (1,000 console / 2,000 network entries; dropped
@@ -120,9 +123,9 @@ Reports leave your machine, so tripwire is conservative about what it stores:
 
 ## Any CDP client (advanced)
 
-The Playwright adapter is sugar — it never even imports playwright. The core
-consumes raw CDP event dicts, so any DevTools-protocol client works; register
-the six handlers yourself:
+The Playwright adapter is a thin wrapper; it does not even import playwright.
+The core consumes raw CDP event dicts, so any DevTools-protocol client works.
+Register the six handlers yourself:
 
 ```python
 client.register.Runtime.consoleAPICalled(recorder.on_console_api_called)
@@ -135,24 +138,25 @@ client.register.Network.loadingFailed(recorder.on_loading_failed)
 #             → recorder.set_response_body(request_id, body)
 ```
 
-Advance `recorder.current_step_index` from your agent's step callback if you're
-not using the `step()` context manager.
+If you are not using the `step()` context manager, advance
+`recorder.current_step_index` from your agent's step callback.
 
 ## Scope
 
 - **Chromium/CDP only** (Chrome, Edge, Brave, headless Chromium). Firefox and
-  Safari don't speak CDP; a WebDriver BiDi adapter is a welcome contribution.
-- **Filing is your job** — tripwire renders the report; you post it wherever
-  issues live. Keeps the dependency footprint at exactly `pydantic`.
+  Safari do not support CDP. Contributions for a WebDriver BiDi adapter are
+  welcome.
+- **You file the issue.** tripwire renders the report; you post it to your
+  issue tracker. This keeps `pydantic` as the only dependency.
 
 ## Roadmap
 
-- PyPI release once the API survives real-world runs
+- PyPI release once the API is stable
 - WebDriver BiDi adapter (cross-browser)
 - `tripwire-mcp`: an MCP server wrapping a browser, for agents (Claude Code,
-  Cursor) that don't own the browser process
+  Cursor) that do not control the browser process
 
 ## License
 
-Apache-2.0. Built by the team at Nua — we use tripwire in production to
+Apache-2.0. Built by the team at Nua. We use tripwire in production to
 auto-file bug reports from our testing agents.

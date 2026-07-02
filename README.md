@@ -63,6 +63,34 @@ generate the report when a failure happens.
 Async Playwright: use `attach_async(recorder, page)` and call
 `await fetch_failed_bodies(recorder, cdp)` before rendering the report.
 
+## Quickstart (browser-use)
+
+Works with the CDP-native [browser-use](https://github.com/browser-use/browser-use)
+(≥ 0.5). `attach()` wires the recorder to the session's CDP client;
+`step_hooks()` turns each agent step into a repro step, described from what
+the agent actually did:
+
+```python
+from browser_use import Agent
+from tripwire import TelemetryRecorder
+from tripwire.integrations.browser_use import attach, step_hooks
+
+agent = Agent(task="Buy the blue socks", llm=llm)
+recorder = TelemetryRecorder()
+
+tw = await attach(recorder, agent.browser_session)
+on_step_start, on_step_end = step_hooks(recorder)
+history = await agent.run(on_step_start=on_step_start, on_step_end=on_step_end)
+
+if not history.is_successful():
+    await tw.fetch_failed_bodies()              # response bodies + final URL
+    file_issue(body=recorder.report())
+```
+
+Handlers are registered on the root CDP client, so events from every tab are
+captured. Telemetry never interferes with the run: every hook and handler
+swallows its own errors.
+
 ## With a Claude tool-use loop
 
 Each tool call Claude makes is one repro step. Give Claude a `report_bug`

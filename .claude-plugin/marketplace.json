@@ -1,0 +1,14 @@
+{
+  "name": "tripwire",
+  "owner": {
+    "name": "Sunny Wan",
+    "email": "sunnywan2020@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "tripwire",
+      "source": "./",
+      "description": "Flight recorder for AI browser agents — records console, network, and repro steps while Claude browses; saves rich bug reports when something breaks."
+    }
+  ]
+}

@@ -19,10 +19,18 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.10"
 pydantic = "^2.0"
+websockets = { version = ">=13,<16", optional = true }
+
+[tool.poetry.extras]
+cli = ["websockets"]
+
+[tool.poetry.scripts]
+tripwire = "tripwire.cli.main:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
 ruff = "^0.8"
+pytest-asyncio = "^1.4.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -37,3 +45,4 @@ select = ["E", "F", "I", "W", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"

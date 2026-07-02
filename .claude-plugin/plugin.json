@@ -1,0 +1,13 @@
+{
+  "name": "tripwire",
+  "displayName": "Tripwire",
+  "version": "0.5.1",
+  "description": "Flight recorder for AI browser agents — records console, network, and repro steps while Claude browses; saves rich bug reports when something breaks.",
+  "author": {
+    "name": "Sunny Wan",
+    "email": "sunnywan2020@gmail.com"
+  },
+  "repository": "https://github.com/TryNUA/tripwire",
+  "license": "Apache-2.0",
+  "keywords": ["testing", "browser", "debugging", "bug-reports", "cdp"]
+}

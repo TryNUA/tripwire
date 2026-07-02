@@ -151,6 +151,23 @@ class TestNetwork:
         assert snapshot.network[0].status == 0
         assert snapshot.network[0].failed is False
 
+    def test_non_flushing_snapshot_leaves_in_flight_requests_pending(self):
+        recorder = TelemetryRecorder()
+        recorder.on_request_will_be_sent(request_event("r1"))
+        recorder.on_response_received(response_event("r1", 500))
+        assert recorder.snapshot(flush_pending=False).network == []
+        recorder.on_loading_finished(finished_event("r1"))
+        entry = recorder.snapshot().network[0]
+        assert entry.status == 500
+        assert entry.failed is True
+
+    def test_non_flushing_snapshot_skips_hooks(self):
+        recorder = TelemetryRecorder()
+        calls = []
+        recorder.snapshot_hooks.append(lambda rec: calls.append(1))
+        recorder.snapshot(flush_pending=False)
+        assert calls == []
+
     def test_body_unavailable_sentinel(self):
         recorder = TelemetryRecorder()
         recorder.on_request_will_be_sent(request_event("r1"))

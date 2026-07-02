@@ -10,7 +10,8 @@ file directly.
 
 Built for agents driving Chromium via CDP: Playwright,
 [browser-use](https://github.com/browser-use/browser-use), Puppeteer bridges,
-or any DevTools-protocol client. The only dependency is `pydantic`.
+or any DevTools-protocol client. The only dependency is `pydantic` (the
+optional `[cli]` extra adds `websockets`).
 
 > ⚠️ Pre-1.0: the API may change. Pin a commit.
 
@@ -28,6 +29,48 @@ information as the agent works.
 ```bash
 pip install git+https://github.com/TryNUA/tripwire  # PyPI soon
 ```
+
+## Claude Code (and any agent that runs shell commands)
+
+The `tripwire` CLI turns tripwire into a passive flight recorder for a browser
+an AI agent is driving — no integration code, any language. Onboarding is one
+command inside Claude Code:
+
+```
+/plugin marketplace add TryNUA/tripwire
+/plugin install tripwire@tripwire
+```
+
+Everything else is automatic — no model in the loop for the wiring:
+
+- a `SessionStart` hook installs the CLI once into the plugin's data dir
+- the plugin bundles Playwright MCP configured to launch its browser with a
+  CDP debug port, so the browser Claude drives **is** the recorded browser
+- a `PreToolUse` hook starts `tripwire watch` the moment Claude first touches
+  a browser tool; the watcher waits for the browser, attaches, and reattaches
+  if the browser is closed and relaunched mid-session
+- the same hook **denies browser tools from other Playwright servers** (their
+  browsers have no debug port, so they can't be recorded) and redirects Claude
+  to the recorded ones — keeping the standalone playwright plugin installed is
+  fine; set `TRIPWIRE_ALLOW_UNRECORDED=1` to bypass the gate deliberately
+- a `PostToolUse` hook runs `tripwire status` after every browser action and
+  pushes new anomalies straight into Claude's context — detection doesn't
+  depend on the model remembering to check
+- an injected observer records clicks, typing, and navigations as
+  steps-to-reproduce (typed values are never read), alongside console and
+  network telemetry
+
+The only decision left to Claude is the one you want judged: whether an
+anomaly is a real bug — and if so, `tripwire save --summary "..."` produces
+the ready-to-file report in `.tripwire/reports/` and shows it to you. So
+`"make sure checkout works"` (optionally under `/loop`) just works.
+
+Without Claude Code: `pip install 'tripwire[cli]'`, launch any Chromium with
+`--remote-debugging-port=9222` (Chrome 136+ requires a non-default
+`--user-data-dir` for this; `tripwire watch --launch` handles that for you),
+run `tripwire watch --cdp http://127.0.0.1:9222`, and give your agent the
+status/save workflow from `skills/tripwire/SKILL.md`. Add `.tripwire/` to your
+`.gitignore`.
 
 ## Quickstart (Playwright)
 
@@ -62,6 +105,34 @@ generate the report when a failure happens.
 
 Async Playwright: use `attach_async(recorder, page)` and call
 `await fetch_failed_bodies(recorder, cdp)` before rendering the report.
+
+## Quickstart (browser-use)
+
+Works with the CDP-native [browser-use](https://github.com/browser-use/browser-use)
+(≥ 0.5). `attach()` wires the recorder to the session's CDP client;
+`step_hooks()` turns each agent step into a repro step, described from what
+the agent actually did:
+
+```python
+from browser_use import Agent
+from tripwire import TelemetryRecorder
+from tripwire.integrations.browser_use import attach, step_hooks
+
+agent = Agent(task="Buy the blue socks", llm=llm)
+recorder = TelemetryRecorder()
+
+tw = await attach(recorder, agent.browser_session)
+on_step_start, on_step_end = step_hooks(recorder)
+history = await agent.run(on_step_start=on_step_start, on_step_end=on_step_end)
+
+if not history.is_successful():
+    await tw.fetch_failed_bodies()              # response bodies + final URL
+    file_issue(body=recorder.report())
+```
+
+Handlers are registered on the root CDP client, so events from every tab are
+captured. Telemetry never interferes with the run: every hook and handler
+swallows its own errors.
 
 ## With a Claude tool-use loop
 
@@ -153,8 +224,8 @@ If you are not using the `step()` context manager, advance
 
 - PyPI release once the API is stable
 - WebDriver BiDi adapter (cross-browser)
-- `tripwire-mcp`: an MCP server wrapping a browser, for agents (Claude Code,
-  Cursor) that do not control the browser process
+- `tripwire-mcp`: an MCP server exposing watch/status/save as tools (the CLI
+  covers Claude Code today; MCP would add agents that can't run shell commands)
 
 ## License
 

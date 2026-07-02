@@ -1,0 +1,36 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - button "🏔️ Trailhead Goods" [ref=f1e5] [cursor=pointer]
+    - button "Cart (0)" [ref=f1e6] [cursor=pointer]
+  - main [ref=f1e7]:
+    - generic [ref=f1e8]:
+      - heading "Shop" [level=1] [ref=f1e9]
+      - generic [ref=f1e10]:
+        - article [ref=f1e11]:
+          - generic [ref=f1e12]: 👕
+          - heading "Trailhead Tee" [level=3] [ref=f1e13]
+          - paragraph [ref=f1e14]: Soft organic-cotton tee for the summit selfie.
+          - generic [ref=f1e15]:
+            - generic [ref=f1e16]: $28.00
+            - button "Add to cart" [ref=f1e17] [cursor=pointer]
+        - article [ref=f1e18]:
+          - generic [ref=f1e19]: 🧴
+          - heading "Summit Water Bottle" [level=3] [ref=f1e20]
+          - paragraph [ref=f1e21]: Insulated 750ml bottle. Keeps cold for 24h.
+          - generic [ref=f1e22]:
+            - generic [ref=f1e23]: $32.00
+            - button "Add to cart" [ref=f1e24] [cursor=pointer]
+        - article [ref=f1e25]:
+          - generic [ref=f1e26]: 🧦
+          - heading "Merino Trail Socks" [level=3] [ref=f1e27]
+          - paragraph [ref=f1e28]: Cushioned merino wool, blister-free miles.
+          - generic [ref=f1e29]:
+            - generic [ref=f1e30]: $18.00
+            - button "Add to cart" [ref=f1e31] [cursor=pointer]
+        - article [ref=f1e32]:
+          - generic [ref=f1e33]: 🧢
+          - heading "Ridge Runner Cap" [level=3] [ref=f1e34]
+          - paragraph [ref=f1e35]: Breathable 5-panel cap with a curved brim.
+          - generic [ref=f1e36]:
+            - generic [ref=f1e37]: $24.00
+            - button "Add to cart" [ref=f1e38] [cursor=pointer]

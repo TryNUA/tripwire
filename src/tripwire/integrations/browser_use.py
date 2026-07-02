@@ -21,6 +21,7 @@ from typing import Any
 
 from tripwire.models import ReportStep
 from tripwire.recorder import BODY_UNAVAILABLE, TelemetryRecorder
+from tripwire.recorder import decode_body as _decode_body
 
 _EVENT_HANDLERS = {
     ("Runtime", "consoleAPICalled"): "on_console_api_called",
@@ -208,8 +209,3 @@ def _describe(model_output: Any) -> str:
         return f"{', '.join(actions)} — {goal}"
     return ", ".join(actions) or goal
 
-
-def _decode_body(result: dict[str, Any]) -> str:
-    if result.get("base64Encoded"):
-        return "<binary body omitted>"
-    return str(result.get("body", ""))

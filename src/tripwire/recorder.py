@@ -27,6 +27,13 @@ from tripwire.report import render_report
 
 BODY_UNAVAILABLE = "body_unavailable"
 
+
+def decode_body(result: dict[str, Any]) -> str:
+    """Text of a ``Network.getResponseBody`` result; binary bodies are omitted."""
+    if result.get("base64Encoded"):
+        return "<binary body omitted>"
+    return str(result.get("body", ""))
+
 _CONSOLE_LEVELS = {"log", "debug", "info", "warning", "error"}
 
 
@@ -187,14 +194,20 @@ class TelemetryRecorder:
 
     # ------------------------------------------------------------------ output
 
-    def snapshot(self) -> TelemetrySnapshot:
-        """The full captured record. Runs hooks, then flushes unfinished requests."""
-        for hook in list(self.snapshot_hooks):
-            with contextlib.suppress(Exception):
-                hook(self)
-        while self._pending:
-            request_id, pending = self._pending.popitem(last=False)
-            self._flush_network(request_id, pending, 0.0, False, "")
+    def snapshot(self, *, flush_pending: bool = True) -> TelemetrySnapshot:
+        """The full captured record. Runs hooks, then flushes unfinished requests.
+
+        Pass ``flush_pending=False`` to observe without mutating (skips hooks and
+        leaves in-flight requests pending) — for periodic persistence while
+        recording continues.
+        """
+        if flush_pending:
+            for hook in list(self.snapshot_hooks):
+                with contextlib.suppress(Exception):
+                    hook(self)
+            while self._pending:
+                request_id, pending = self._pending.popitem(last=False)
+                self._flush_network(request_id, pending, 0.0, False, "")
         if not self._environment.target_url:
             first_document = next(
                 (e for e in self._network if e.resource_type.lower() == "document"), None

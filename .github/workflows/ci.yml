@@ -20,7 +20,7 @@ jobs:
       - name: Install poetry
         run: pipx install poetry
       - name: Install dependencies
-        run: poetry install
+        run: poetry install --all-extras
       - name: Lint
         run: poetry run ruff check .
       - name: Test

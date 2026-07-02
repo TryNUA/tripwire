@@ -10,7 +10,8 @@ file directly.
 
 Built for agents driving Chromium via CDP: Playwright,
 [browser-use](https://github.com/browser-use/browser-use), Puppeteer bridges,
-or any DevTools-protocol client. The only dependency is `pydantic`.
+or any DevTools-protocol client. The only dependency is `pydantic` (the
+optional `[cli]` extra adds `websockets`).
 
 > ⚠️ Pre-1.0: the API may change. Pin a commit.
 
@@ -28,6 +29,42 @@ information as the agent works.
 ```bash
 pip install git+https://github.com/TryNUA/tripwire  # PyPI soon
 ```
+
+## Claude Code (and any agent that runs shell commands)
+
+The `tripwire` CLI turns tripwire into a passive flight recorder for a browser
+an AI agent is driving — no integration code, any language. Onboarding is one
+command inside Claude Code:
+
+```
+/plugin marketplace add TryNUA/tripwire
+/plugin install tripwire@tripwire
+```
+
+That installs a skill that teaches Claude the workflow. From then on, whenever
+Claude does browser work (`"make sure checkout works"`, optionally under
+`/loop`), it:
+
+1. starts `tripwire watch --launch` in the background — a Chromium with the
+   recorder attached over CDP; clicks, typing, navigations, console, and
+   network are captured automatically (an injected observer builds the
+   steps-to-reproduce; typed values are never read)
+2. drives that browser (e.g. Playwright MCP with
+   `--cdp-endpoint http://127.0.0.1:9222`)
+3. runs `tripwire status` after each task — new exceptions, console errors,
+   and failed requests since the last check
+4. decides whether it found a real bug, and if so runs
+   `tripwire save --summary "..."` and shows you the ready-to-file report
+   from `.tripwire/reports/`
+
+Without the plugin: `pip install 'tripwire[cli]'` (or run via
+`uvx --from 'tripwire[cli] @ git+https://github.com/TryNUA/tripwire' tripwire`)
+and copy `skills/tripwire/` into `~/.claude/skills/` — or paste its workflow
+into any other agent's rules. To watch a browser you launched yourself, start
+it with `--remote-debugging-port=9222` and run
+`tripwire watch --cdp http://127.0.0.1:9222`. Note Chrome 136+ refuses the
+debug port on your default profile — use a separate `--user-data-dir`
+(`--launch` handles this for you). Add `.tripwire/` to your `.gitignore`.
 
 ## Quickstart (Playwright)
 
@@ -181,8 +218,8 @@ If you are not using the `step()` context manager, advance
 
 - PyPI release once the API is stable
 - WebDriver BiDi adapter (cross-browser)
-- `tripwire-mcp`: an MCP server wrapping a browser, for agents (Claude Code,
-  Cursor) that do not control the browser process
+- `tripwire-mcp`: an MCP server exposing watch/status/save as tools (the CLI
+  covers Claude Code today; MCP would add agents that can't run shell commands)
 
 ## License
 

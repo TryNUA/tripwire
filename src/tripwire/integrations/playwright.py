@@ -12,6 +12,7 @@ import contextlib
 from typing import Any
 
 from tripwire.recorder import BODY_UNAVAILABLE, TelemetryRecorder
+from tripwire.recorder import decode_body as _decode_body
 
 _EVENT_HANDLERS = {
     "Runtime.consoleAPICalled": "on_console_api_called",
@@ -120,9 +121,3 @@ def _fetch_body_sync(cdp: Any, request_id: str) -> str:
     except Exception:
         return BODY_UNAVAILABLE
     return _decode_body(result)
-
-
-def _decode_body(result: dict[str, Any]) -> str:
-    if result.get("base64Encoded"):
-        return "<binary body omitted>"
-    return str(result.get("body", ""))

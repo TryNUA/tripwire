@@ -1,7 +1,7 @@
 {
   "name": "tripwire",
   "displayName": "Tripwire",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Flight recorder for AI browser agents — records console, network, and repro steps while Claude browses; saves rich bug reports when something breaks.",
   "author": {
     "name": "Sunny Wan",

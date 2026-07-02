@@ -17,6 +17,7 @@ class FakeCDPClient:
         self.sent = []
         self.responders = {}
         self.handler = None
+        self.closed = False
 
     def on_event(self, handler):
         self.handler = handler
@@ -37,9 +38,8 @@ class FakeCDPClient:
 
 @pytest.fixture
 async def watcher(tmp_path):
-    client = FakeCDPClient()
-    w = Watcher(TelemetryRecorder(), client, tmp_path, "http://127.0.0.1:9222")
-    await w.start()
+    w = Watcher(TelemetryRecorder(), tmp_path, "http://127.0.0.1:9222")
+    await w.attach(FakeCDPClient())
     return w
 
 
@@ -111,8 +111,39 @@ class TestAttach:
                 {"type": "browser", "targetId": "b", "attached": True},
             ]
         }
-        await Watcher(TelemetryRecorder(), client, tmp_path, "").start()
+        await Watcher(TelemetryRecorder(), tmp_path, "").attach(client)
         assert client.calls("Target.attachToTarget")[0][1] == {"targetId": "old", "flatten": True}
+
+
+class TestReconnect:
+    async def test_run_returns_when_connection_dies(self, watcher):
+        watcher.client.closed = True
+        await asyncio.wait_for(watcher.run_until_disconnect(), timeout=1.0)
+
+    async def test_run_returns_on_stop(self, watcher):
+        watcher.stop.set()
+        await asyncio.wait_for(watcher.run_until_disconnect(), timeout=1.0)
+
+    async def test_reattach_keeps_recorder_and_resets_sessions(self, watcher, tmp_path):
+        old_client = watcher.client
+        attach_page(old_client)
+        binding(old_client, {"kind": "click", "target": "button#pay"})
+        old_client.closed = True
+
+        new_client = FakeCDPClient()
+        await watcher.attach(new_client)
+        attach_page(new_client)  # same session id again — must set up fresh
+        await settle()
+        assert len(new_client.calls("Runtime.addBinding")) == 1
+        assert new_client.calls("Target.setAutoAttach")
+        binding(new_client, {"kind": "click", "target": "button#confirm"})
+        assert [s.description for s in watcher.recorder.steps] == [
+            "click button#pay",
+            "click button#confirm",
+        ]
+        watcher.persist()  # the run loop does this within 2s; force it here
+        session = state.read_session(tmp_path)
+        assert len(session.steps) == 2
 
 
 class TestSteps:

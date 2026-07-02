@@ -43,6 +43,10 @@ class CDPClient:
     def on_event(self, handler: Callable[[str, dict[str, Any], str | None], None]) -> None:
         self._handler = handler
 
+    @property
+    def closed(self) -> bool:
+        return self._reader_task.done()
+
     async def send(
         self,
         method: str,

@@ -51,15 +51,21 @@ _PERSIST_INTERVAL = 2.0
 
 
 class Watcher:
+    """One Watcher per ``tripwire watch`` run; ``attach()`` per browser connection.
+
+    The browser may not exist yet when the watcher starts, and may die and be
+    relaunched mid-session — the recorder and on-disk state live across
+    reconnects, per-connection bookkeeping does not.
+    """
+
     def __init__(
         self,
         recorder: TelemetryRecorder,
-        client: CDPClient,
         state_dir: Path,
         cdp_http_url: str,
     ) -> None:
         self.recorder = recorder
-        self.client = client
+        self.client: CDPClient | None = None
         self.state_dir = state_dir
         self.cdp_http_url = cdp_http_url
         self.started_at = time.time()
@@ -68,7 +74,10 @@ class Watcher:
         self._request_sessions: OrderedDict[str, str | None] = OrderedDict()
         self._dirty = False
 
-    async def start(self) -> None:
+    async def attach(self, client: CDPClient) -> None:
+        self.client = client
+        self._sessions.clear()
+        self._request_sessions.clear()
         self.client.on_event(self.handle_event)
         await self.client.send(
             "Target.setAutoAttach",
@@ -115,10 +124,12 @@ class Watcher:
         if target_type != "page" or not session_id or session_id in self._sessions:
             return
         self._sessions.add(session_id)
-        asyncio.ensure_future(self._setup_session(session_id))
+        # Bind the current client: a task outliving a reconnect must talk to the
+        # dead connection (harmless, suppressed), not the new one.
+        asyncio.ensure_future(self._setup_session(self.client, session_id))
 
-    async def _setup_session(self, session_id: str) -> None:
-        send = self.client.send
+    async def _setup_session(self, client: CDPClient, session_id: str) -> None:
+        send = client.send
         for method, params in (
             ("Runtime.enable", {}),
             ("Network.enable", {}),
@@ -175,14 +186,14 @@ class Watcher:
         self._dirty = True
         if method in ("Network.loadingFinished", "Network.loadingFailed"):
             if self.recorder.pending_failed_request_ids():
-                asyncio.ensure_future(self._fetch_failed_bodies())
+                asyncio.ensure_future(self._fetch_failed_bodies(self.client))
         elif method == "Runtime.exceptionThrown":
             self.persist()  # anomalies hit disk immediately; the browser may die next
 
-    async def _fetch_failed_bodies(self) -> None:
+    async def _fetch_failed_bodies(self, client: CDPClient) -> None:
         for request_id in self.recorder.pending_failed_request_ids():
             try:
-                result = await self.client.send(
+                result = await client.send(
                     "Network.getResponseBody",
                     {"requestId": request_id},
                     session_id=self._request_sessions.get(request_id),
@@ -209,8 +220,9 @@ class Watcher:
             )
         self._dirty = False
 
-    async def run_forever(self) -> None:
-        while not self.stop.is_set():
+    async def run_until_disconnect(self) -> None:
+        """Persist loop; returns when stopped or the CDP connection dies."""
+        while not self.stop.is_set() and not (self.client is None or self.client.closed):
             with contextlib.suppress(asyncio.TimeoutError, TimeoutError):
                 await asyncio.wait_for(self.stop.wait(), timeout=_PERSIST_INTERVAL)
             if self._dirty:
@@ -238,14 +250,11 @@ async def _watch(args: Any) -> int:
         from tripwire.cli.launch import LaunchedBrowser
 
         browser = LaunchedBrowser.launch(port=args.port, browser_path=args.browser_path)
-        ws_url, http_url = browser.ws_url, browser.http_url
+        http_url = browser.http_url
     else:
         http_url = args.cdp
-        ws_url = discover_ws_url(http_url)
 
-    client = await CDPClient.connect(ws_url)
-    watcher = Watcher(TelemetryRecorder(), client, state.STATE_DIR, http_url)
-    await watcher.start()
+    watcher = Watcher(TelemetryRecorder(), state.STATE_DIR, http_url)
     print(f"tripwire: watching {http_url} — state in {state.STATE_DIR}/", flush=True)
     if browser is not None:
         print(
@@ -257,11 +266,39 @@ async def _watch(args: Any) -> int:
     for sig in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, watcher.stop.set)
+
+    # Claim the session file right away so concurrent starts (e.g. a hook
+    # firing on parallel tool calls) see a live watcher and bail.
+    watcher.persist()
+
+    # The browser may not be up yet (a hook can start the watcher before the
+    # agent's first browser tool runs) and may die and relaunch mid-session:
+    # wait, attach, record until the connection drops, repeat.
+    waiting_logged = False
     try:
-        await watcher.run_forever()
+        while not watcher.stop.is_set():
+            try:
+                ws_url = browser.ws_url if browser is not None else discover_ws_url(http_url)
+                client = await CDPClient.connect(ws_url)
+            except Exception:
+                if not waiting_logged:
+                    print(f"tripwire: waiting for a browser at {http_url}", flush=True)
+                    waiting_logged = True
+                await _wait(watcher.stop, _PERSIST_INTERVAL)
+                continue
+            waiting_logged = False
+            await watcher.attach(client)
+            await watcher.run_until_disconnect()
+            with contextlib.suppress(Exception):
+                await client.close()
+            if browser is not None:
+                break  # we own the launched browser; if it's gone, we're done
     finally:
-        with contextlib.suppress(Exception):
-            await client.close()
         if browser is not None:
             browser.cleanup()
     return 0
+
+
+async def _wait(stop: asyncio.Event, seconds: float) -> None:
+    with contextlib.suppress(asyncio.TimeoutError, TimeoutError):
+        await asyncio.wait_for(stop.wait(), timeout=seconds)

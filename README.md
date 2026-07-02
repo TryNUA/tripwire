@@ -41,30 +41,36 @@ command inside Claude Code:
 /plugin install tripwire@tripwire
 ```
 
-That installs a skill that teaches Claude the workflow. From then on, whenever
-Claude does browser work (`"make sure checkout works"`, optionally under
-`/loop`), it:
+Everything else is automatic — no model in the loop for the wiring:
 
-1. starts `tripwire watch --launch` in the background — a Chromium with the
-   recorder attached over CDP; clicks, typing, navigations, console, and
-   network are captured automatically (an injected observer builds the
-   steps-to-reproduce; typed values are never read)
-2. drives that browser (e.g. Playwright MCP with
-   `--cdp-endpoint http://127.0.0.1:9222`)
-3. runs `tripwire status` after each task — new exceptions, console errors,
-   and failed requests since the last check
-4. decides whether it found a real bug, and if so runs
-   `tripwire save --summary "..."` and shows you the ready-to-file report
-   from `.tripwire/reports/`
+- a `SessionStart` hook installs the CLI once into the plugin's data dir
+- the plugin bundles Playwright MCP configured to launch its browser with a
+  CDP debug port, so the browser Claude drives **is** the recorded browser
+- a `PreToolUse` hook starts `tripwire watch` the moment Claude first touches
+  a browser tool; the watcher waits for the browser, attaches, and reattaches
+  if the browser is closed and relaunched mid-session
+- the same hook **denies browser tools from other Playwright servers** (their
+  browsers have no debug port, so they can't be recorded) and redirects Claude
+  to the recorded ones — keeping the standalone playwright plugin installed is
+  fine; set `TRIPWIRE_ALLOW_UNRECORDED=1` to bypass the gate deliberately
+- a `PostToolUse` hook runs `tripwire status` after every browser action and
+  pushes new anomalies straight into Claude's context — detection doesn't
+  depend on the model remembering to check
+- an injected observer records clicks, typing, and navigations as
+  steps-to-reproduce (typed values are never read), alongside console and
+  network telemetry
 
-Without the plugin: `pip install 'tripwire[cli]'` (or run via
-`uvx --from 'tripwire[cli] @ git+https://github.com/TryNUA/tripwire' tripwire`)
-and copy `skills/tripwire/` into `~/.claude/skills/` — or paste its workflow
-into any other agent's rules. To watch a browser you launched yourself, start
-it with `--remote-debugging-port=9222` and run
-`tripwire watch --cdp http://127.0.0.1:9222`. Note Chrome 136+ refuses the
-debug port on your default profile — use a separate `--user-data-dir`
-(`--launch` handles this for you). Add `.tripwire/` to your `.gitignore`.
+The only decision left to Claude is the one you want judged: whether an
+anomaly is a real bug — and if so, `tripwire save --summary "..."` produces
+the ready-to-file report in `.tripwire/reports/` and shows it to you. So
+`"make sure checkout works"` (optionally under `/loop`) just works.
+
+Without Claude Code: `pip install 'tripwire[cli]'`, launch any Chromium with
+`--remote-debugging-port=9222` (Chrome 136+ requires a non-default
+`--user-data-dir` for this; `tripwire watch --launch` handles that for you),
+run `tripwire watch --cdp http://127.0.0.1:9222`, and give your agent the
+status/save workflow from `skills/tripwire/SKILL.md`. Add `.tripwire/` to your
+`.gitignore`.
 
 ## Quickstart (Playwright)
 
